@@ -1,0 +1,44 @@
+# WAHA image is pinned by tag AND digest: upgrade deliberately, never `latest`.
+services:
+  waha:
+    build: ./waha   # pinned WAHA image + service-worker bypass so the WhatsApp Web pin holds
+    restart: unless-stopped
+    shm_size: 1gb
+    mem_limit: 2g
+    environment:
+      TZ: ${TZ:-UTC}
+      WHATSAPP_DEFAULT_ENGINE: WEBJS
+      WAHA_API_KEY: ${WAHA_API_KEY}
+      WAHA_DASHBOARD_ENABLED: "false"
+      WHATSAPP_SWAGGER_ENABLED: "false"
+      WAHA_APPS_ENABLED: "false"
+      WAHA_PRESENCE_AUTO_ONLINE: "false"   # default is true: it would show you "online"
+      WAHA_EVENTS_DOWNLOAD_MEDIA: "false"
+      WAHA_API_DOWNLOAD_MEDIA: "false"
+      WAHA_WEBJS_CACHE_TYPE: local         # serve the pinned WhatsApp Web build...
+      WAHA_WEBJS_WEB_VERSION: ${WA_WEB_VERSION}
+      WHATSAPP_HOOK_URL: http://gateway:8000/webhook
+      WHATSAPP_HOOK_EVENTS: message.any,message.edited,message.revoked,session.status
+      WHATSAPP_HOOK_HMAC_KEY: ${WEBHOOK_HMAC_KEY}
+    volumes:
+      - ./data/waha:/app/.sessions
+      # ...from this file (scripts/pin-webversion.sh); rw because whatsapp-web.js re-persists it
+      - ./webcache/${WA_WEB_VERSION}.html:/app/dist/core/engines/webjs/${WA_WEB_VERSION}.html
+
+  gateway:
+    build: ./gateway
+    restart: unless-stopped
+    depends_on: [waha]
+    env_file: .env
+    ports: ["8000:8000"]   # for the tunnel connector; firewall the source to it only
+    volumes:
+      - ./data/gateway:/data
+      - ./clients.json:/app/clients.json:ro
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.9.1
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    profiles: [tunnel]

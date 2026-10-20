@@ -1,0 +1,5 @@
+{
+  "<personal service token client id>.access": {"name": "personal", "chats": "*"},
+  "<org service token client id>.access": {"name": "org", "chats": ["120363000000000000@g.us"]},
+  "<monitor service token client id>.access": {"name": "monitor", "chats": []}
+}
