@@ -27,7 +27,7 @@ from mcp.server.mcpserver import Context, Image, MCPServer
 from pypdf import PdfReader
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import FileResponse, JSONResponse, Response
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("wa-gateway")
@@ -454,7 +454,11 @@ jwks = jwt.PyJWKClient(f"https://{CF_TEAM}/cdn-cgi/access/certs", cache_keys=Tru
 
 
 def client_of(ctx: Context) -> dict:
-    token = (ctx.headers or {}).get("cf-access-jwt-assertion")
+    return client_from(ctx.headers or {})
+
+
+def client_from(headers) -> dict:
+    token = headers.get("cf-access-jwt-assertion")
     if not (token and jwks):
         raise PermissionError("missing Cloudflare Access token")
     claims = jwt.decode(token, jwks.get_signing_key_from_jwt(token).key, algorithms=["RS256"],
@@ -632,6 +636,35 @@ def list_media(ctx: Context, chat_id: str | None = None, type: str | None = None
             where, params = f"{where} AND {col} = ?", [*params, val]
     data = rows(f"{MEDIA_ROW} WHERE {where} ORDER BY m.ts DESC LIMIT ?", (*params, min(limit, 500)))
     return respond({"media": [{k: v for k, v in d.items() if k != "path"} for d in data]})
+
+
+def file_name(r):
+    """The original filename, or "<sender> <date> <time>.<ext>" for voice notes, photos and the like."""
+    if r["filename"]:
+        name = r["filename"]
+    else:
+        mime = (r["mimetype"] or "").split(";")[0].strip()
+        ext = {"audio/ogg": ".ogg", "image/jpeg": ".jpg", "audio/mpeg": ".mp3"}.get(mime) or \
+            mimetypes.guess_extension(mime) or ""
+        name = f"{'me' if r['from_me'] else r['sender_name'] or 'whatsapp'} {r['time'][:16].replace('T', ' ').replace(':', '-')}{ext}"
+    return re.sub(r'[/\\\x00-\x1f:*?"<>|]', "_", name).strip(" .")[:150] or "file"
+
+
+@mcp.custom_route("/files/{msg_id}", methods=["GET"])
+async def file_download(req: Request) -> Response:
+    """The saved file itself, for clients that pass it on as is (same Cloudflare token and chat scope as MCP)."""
+    try:
+        client = client_from(req.headers)
+    except Exception:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    r = media_row(client, req.path_params["msg_id"])
+    if not r:
+        return JSONResponse({"error": "no media for this message id (or not in your chats)"}, status_code=404)
+    if r["status"] != "saved":
+        return JSONResponse({"error": f"file not saved (status {r['status']}): request_media downloads it"},
+                            status_code=409)
+    return FileResponse(os.path.join(MEDIA_DIR, r["path"]), media_type=r["mimetype"] or "application/octet-stream",
+                        filename=file_name(r))
 
 
 @mcp.custom_route("/webhook", methods=["POST"])
