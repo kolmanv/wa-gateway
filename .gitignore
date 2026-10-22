@@ -3,3 +3,4 @@ clients.json
 data/
 webcache/
 __pycache__/
+media.json

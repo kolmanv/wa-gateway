@@ -1,0 +1,8 @@
+{
+  "auto_types": ["ptt", "audio", "image", "document"],
+  "max_mb": {"image": 20, "document": 30},
+  "skip_chats": {},
+  "delay_seconds": [3, 30],
+  "max_per_hour": 60,
+  "keep_days": 365
+}

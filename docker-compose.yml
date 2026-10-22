@@ -34,6 +34,7 @@ services:
     volumes:
       - ./data/gateway:/data
       - ./clients.json:/app/clients.json:ro
+      - ./media.json:/app/media.json:ro
 
   cloudflared:
     image: cloudflare/cloudflared:2026.9.1

@@ -14,6 +14,12 @@ WhatsApp ── WAHA (WEBJS: real WhatsApp Web in Chrome, pinned build) ──we
   Identity comes from the signed `Cf-Access-Jwt-Assertion` header, verified against the Access app's AUD.
 - **Pinned.** WAHA by image digest (`waha/Dockerfile`); WhatsApp Web by build (`scripts/pin-webversion.sh`, builds
   live ~2 months). The page bypasses WhatsApp's service worker, which otherwise loads the latest build after login.
+- **Media, modestly.** New voice notes, audio, images and documents from others are saved as they arrive: one at a
+  time, after a random 3-30 s pause, at most `max_per_hour`, stored once per checksum, deleted after `keep_days`.
+  Everything else (video, stickers, large files, your own media, chats in `skip_chats`) is fetched only on request.
+  Rules in `media.json` (see `media.example.json`); `skip_chats` takes chat ids with `"*"` or a list of types.
+  The only extra WAHA calls are "get one message with its file" and "fetch that file"; WAHA's own bulk media
+  download stays off.
 - **Self-healing, then loud.** The watchdog restarts a failed session (backoff, `MAX_RESTARTS_PER_DAY`); a logout,
   wrong account or too many restarts stops the session and notifies (`NOTIFY_BACKENDS`). Every tool response
   carries a `warning` while unhealthy.
@@ -21,7 +27,9 @@ WhatsApp ── WAHA (WEBJS: real WhatsApp Web in Chrome, pinned build) ──we
 ## Tools
 
 `get_status`, `list_chats`, `get_messages(chat_id, before_seq)`, `search_messages(query, chat_id)`,
-`get_new_messages()` (cursor kept server-side per client).
+`get_new_messages()` (cursor kept server-side per client), `list_media(chat_id, type, status)`,
+`get_media(message_id)` (details; images as images, PDF and text as text), `request_media(message_id)` (fetch now).
+Messages show their media status (`saved`, `on_demand`, `waiting`, `expired`, `failed`, `skipped`).
 
 ## Operate (LXC, `/opt/wa-gateway`)
 

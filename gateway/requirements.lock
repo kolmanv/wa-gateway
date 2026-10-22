@@ -17,12 +17,13 @@ pycparser==3.11
 pydantic==2.14.1
 pydantic_core==2.50.1
 PyJWT==2.15.1
+pypdf==6.21.2
 python-multipart==0.0.32
 referencing==0.37.0
 rpds-py==2026.9.1
 sse-starlette==3.5.0
 starlette==1.8.0
 truststore==0.10.5
-typing-inspection==0.4.4
 typing_extensions==4.16.0
+typing-inspection==0.4.4
 uvicorn==0.54.0

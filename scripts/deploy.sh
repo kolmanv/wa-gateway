@@ -8,5 +8,6 @@ pct exec $CT -- sh -c "cd $DIR && chmod +x scripts/*.sh && mkdir -p data/waha da
   [ -f .env ] || { cp .env.example .env
     sed -i \"s/^WAHA_API_KEY=.*/WAHA_API_KEY=\$(openssl rand -hex 32)/; s/^WEBHOOK_HMAC_KEY=.*/WEBHOOK_HMAC_KEY=\$(openssl rand -hex 32)/\" .env
     chmod 600 .env; echo 'created .env with fresh secrets'; }
-  [ -f clients.json ] || { echo '{}' > clients.json; echo 'created empty clients.json'; }"
+  [ -f clients.json ] || { echo '{}' > clients.json; echo 'created empty clients.json'; }
+  [ -f media.json ] || { cp media.example.json media.json; echo 'created media.json from the example'; }"
 echo "deployed to CT $CT:$DIR - then: pct exec $CT -- sh -c 'cd $DIR && docker compose up -d --build'"
