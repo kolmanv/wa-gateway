@@ -48,7 +48,7 @@ CLIENTS = json.load(open(env("CLIENTS_FILE", "/app/clients.json")))
 # video, sticker. Delays look human: one download at a time, a random pause first, a cap per hour.
 MEDIA_FILE = env("MEDIA_FILE", "/app/media.json")
 MEDIA = {"auto_types": ["ptt", "audio", "image", "document"], "max_mb": {"image": 20, "document": 30},
-         "skip_chats": {}, "delay_seconds": [3, 30], "max_per_hour": 60, "keep_days": 365,
+         "skip_chats": {}, "save_own": True, "delay_seconds": [3, 30], "max_per_hour": 60, "keep_days": 365,
          **(json.load(open(MEDIA_FILE)) if os.path.exists(MEDIA_FILE) else {})}
 MEDIA_DIR = env("MEDIA_DIR", "/data/media")
 
@@ -123,7 +123,7 @@ def number(v):
 
 def auto_rule(chat, kind, size, from_me=False):
     """(status, reason) for a new media message: 'waiting' = save it now, 'on_demand' = only when asked."""
-    if from_me:  # already on the owner's phone; and in groups, fetching it also queries its read receipts
+    if from_me and not MEDIA["save_own"]:  # note: in groups, WAHA also fetches an own message's read receipts
         return "on_demand", "sent by the owner"
     if kind not in MEDIA["auto_types"]:
         return "on_demand", f"{kind} is saved only on request"

@@ -127,7 +127,7 @@ hook("message.any", {**mm("mine1", "me@c.us", "image", "image/png"), "to": "g1@g
 st = dict(app.db.execute("select msg_id, status from media").fetchall())
 ok(st == {"img1": "waiting", "img2": "waiting", "ptt1": "waiting", "vid1": "on_demand", "big1": "on_demand",
           "skip1": "on_demand", "img3": "on_demand", "ptt2": "waiting", "vo1": "skipped", "gone1": "waiting",
-          "mine1": "on_demand"},
+          "mine1": "waiting"},
    f"auto rules: types, size, skip_chats (all and per type), view-once, own media ({st})")
 for i in ("img1", "img2", "ptt1", "gone1"): asyncio.run(app.save_media(i))
 r = app.db.execute("select * from media where msg_id='img1'").fetchone()
