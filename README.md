@@ -21,6 +21,11 @@ WhatsApp ── WAHA (WEBJS: real WhatsApp Web in Chrome, pinned build) ──we
   Rules in `media.json` (see `media.example.json`); `skip_chats` takes chat ids with `"*"` or a list of types.
   The only extra WAHA calls are "get one message with its file" and "fetch that file"; WAHA's own bulk media
   download stays off.
+- **Transcripts, locally.** With `KATZRAN_URL`/`KATZRAN_TOKEN` set, saved voice notes and audio up to
+  `transcribe_max_minutes` are sent to [katzran](https://github.com/kolmanv/katzran), a self-hosted speech-to-text
+  service (Hebrew, Russian, English, switching mid-note), one at a time; longer ones and video on `request_media`.
+  Transcripts are stored per checksum next to the file, shown in message listings, searched with the text, and
+  deleted with the file. Nothing leaves the network.
 - **Self-healing, then loud.** The watchdog restarts a failed session (backoff, `MAX_RESTARTS_PER_DAY`); a logout,
   wrong account or too many restarts stops the session and notifies (`NOTIFY_BACKENDS`). Every tool response
   carries a `warning` while unhealthy.
@@ -29,8 +34,10 @@ WhatsApp ── WAHA (WEBJS: real WhatsApp Web in Chrome, pinned build) ──we
 
 `get_status`, `list_chats`, `get_messages(chat_id, before_seq)`, `search_messages(query, chat_id)`,
 `get_new_messages()` (cursor kept server-side per client), `list_media(chat_id, type, status)`,
-`get_media(message_id)` (details; images as images, PDF and text as text), `request_media(message_id)` (fetch now).
-Messages show their media status (`saved`, `on_demand`, `waiting`, `expired`, `failed`, `skipped`).
+`get_media(message_id)` (details; images as images, PDF and text as text, audio as its transcript),
+`request_media(message_id)` (fetch now; audio and video also get a transcript).
+Messages show their media status (`saved`, `on_demand`, `waiting`, `expired`, `failed`, `skipped`) and, for voice
+notes, `transcript_status` and the transcript (`[he 0:12] ...` lines). Search covers transcripts too.
 
 ## Operate (LXC, `/opt/wa-gateway`)
 

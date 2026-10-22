@@ -163,3 +163,46 @@ ok(True, "guard: only GET of one message and its file are new")
 app.db.execute("update media set delete_after=0 where msg_id='img1'"); app.cleanup_media()
 p = app.db.execute("select path from media where msg_id='img2'").fetchone()[0]
 ok(os.path.exists(f"/tmp/media/{p}"), "cleanup keeps a file another message still uses")
+
+# --- transcripts (katzran) ----------------------------------------------------
+kz = {"posted": 0, "polls": 0}
+async def fake_katzran(method, path, **kw):
+    if method == "POST":
+        kz["posted"] += 1; return {"id": "j1", "status": "queued"}
+    if method == "DELETE": return None
+    kz["polls"] += 1
+    if kz["polls"] < 2: return {"id": "j1", "status": "working"}
+    return {"id": "j1", "status": "done", "seconds": 4.2, "segments": [
+        {"start": 0.0, "end": 9.5, "lang": "he", "model": "he", "text": "נפגשים מחר בשמונה"},
+        {"start": 61.0, "end": 70.0, "lang": "ru", "model": "general", "text": "встреча завтра",
+         "alt": {"lang": "he", "model": "he", "text": "בסטרצ'ה"}}]}
+async def no_sleep(s): pass
+app.katzran = fake_katzran
+app.KATZRAN["base_url"] = "http://katzran:9000"
+sha = app.db.execute("select sha256 from media where msg_id='ptt1'").fetchone()[0]
+app.want_transcript("ptt", sha, 7.0)
+ok(app.db.execute("select status from transcripts where sha256=?", (sha,)).fetchone()[0] == "waiting",
+   "saved voice note queued for a transcript")
+app.want_transcript("ptt", "longsha", 3600)
+ok(app.db.execute("select status from transcripts where sha256='longsha'").fetchone()[0] == "on_demand",
+   "voice note over transcribe_max_minutes waits for a request")
+real_sleep = asyncio.sleep; app.asyncio.sleep = no_sleep
+asyncio.run(app.transcribe(sha)); app.asyncio.sleep = real_sleep
+t = app.db.execute("select * from transcripts where sha256=?", (sha,)).fetchone()
+ok(t["status"] == "done" and t["languages"] == "he,ru" and "[ru 1:01] встреча завтра" in t["text"]
+   and "(or, read as he: בסטרצ'ה)" in t["text"], "transcript stored with language lines and the alt reading")
+gm = call("pid.access", "get_messages", chat_id="x@c.us")["messages"]
+ok(any(x["id"] == "ptt1" and "נפגשים מחר" in (x["transcript"] or "") for x in gm), "messages show the transcript")
+s = call("pid.access", "search_messages", query="встреча")["messages"]
+ok([x["id"] for x in s] == ["ptt1"], "search finds words inside transcripts")
+ok(call("oid.access", "search_messages", query="встреча")["messages"] == [], "transcript search stays scoped")
+g = raw("pid.access", "get_media", message_id="ptt1")["content"]
+ok(len(g) == 2 and "[he 0:00]" in g[1]["text"], "get_media returns the voice note's transcript")
+async def down(method, path, **kw): raise app.httpx2.ConnectError("katzran unreachable")
+app.katzran = down; app.transcripts_q = asyncio.Queue()
+app.db.execute("update transcripts set status='waiting' where sha256='longsha'")
+app.db.execute("update media set sha256='longsha', status='saved', path=(select path from media where msg_id='ptt1') where msg_id='ptt2'")
+async def once(): await app.transcribe("longsha")
+asyncio.run(once())
+t = app.db.execute("select status, attempts from transcripts where sha256='longsha'").fetchone()
+ok(t["status"] == "waiting" and t["attempts"] == 1, "katzran down: transcript retried later, not lost")
