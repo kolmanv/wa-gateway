@@ -216,3 +216,16 @@ ok(base64.b64decode(res.get("blob", "")) == PNG and res.get("mimeType") == "imag
    "get_file: the original file as an embedded resource, with a readable name")
 ok("error" in raw("pid.access", "get_file", message_id="vid1")["content"][0]["text"], "get_file: not saved, says to request_media")
 ok("error" in raw("oid.access", "get_file", message_id="ptt1")["content"][0]["text"], "get_file: scoped to client's chats")
+
+# --- a recording sent as a document is transcribed on request ---------------------------
+app.katzran = fake_katzran; app.transcripts_q = asyncio.Queue()
+hook("message.any", mm("doc1", "x@c.us", "document", "audio/mp4", filename="meeting.m4a"))
+app.db.execute("update media set status='saved', sha256='docsha', path=(select path from media where msg_id='ptt1') where msg_id='doc1'")
+raw("pid.access", "request_media", message_id="doc1")
+ok(app.db.execute("select status from transcripts where sha256='docsha'").fetchone()[0] == "waiting",
+   "request_media transcribes audio sent as a document")
+hook("message.any", mm("doc2", "x@c.us", "document", "application/zip"))
+app.db.execute("update media set status='saved', sha256='zipsha', path=(select path from media where msg_id='img2') where msg_id='doc2'")
+raw("pid.access", "request_media", message_id="doc2")
+ok(app.db.execute("select count(*) from transcripts where sha256='zipsha'").fetchone()[0] == 0,
+   "other documents get no transcript")

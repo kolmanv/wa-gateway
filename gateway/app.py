@@ -607,7 +607,7 @@ def get_media(ctx: Context, message_id: str) -> list:
 @mcp.tool()
 async def request_media(ctx: Context, message_id: str) -> list:
     """Download a message's file now (any type, any chat), then return it like get_media. Takes up to ~40 s.
-    For audio and video it also starts a transcript (a few minutes for long files): get_media later shows it."""
+    For audio and video (also when sent as a document) it also starts a transcript (a few minutes for long files): get_media later shows it."""
     client = client_of(ctx)
     where, params = scope(client)
     m = db.execute(f"SELECT m.id, m.chat_id, m.type, m.has_media FROM messages m WHERE {where} AND m.id = ?",
@@ -620,7 +620,9 @@ async def request_media(ctx: Context, message_id: str) -> list:
         await save_media(message_id, auto=False)
         r = media_row(client, message_id)
     if r["status"] == "saved":
-        want_transcript(r["type"], r["sha256"], r["duration"], force=True)
+        mime = (r["mimetype"] or "").split("/")[0]  # a recording sent as a document is still audio or video
+        kind = mime if r["type"] == "document" and mime in ("audio", "video") else r["type"]
+        want_transcript(kind, r["sha256"], r["duration"], force=True)
         r = media_row(client, message_id)
     return media_content(r) if r["status"] == "saved" else [respond(r)]
 
