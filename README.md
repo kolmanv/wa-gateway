@@ -36,21 +36,12 @@ WhatsApp ── WAHA (WEBJS: real WhatsApp Web in Chrome, pinned build) ──we
 `get_new_messages()` (cursor kept server-side per client), `list_media(chat_id, type, status)`,
 `get_media(message_id)` (details; images as images, PDF and text as text, audio as its transcript),
 `request_media(message_id)` (fetch now; audio and video also get a transcript),
-`get_file_link(message_id)` (where to download the original file, below).
+`get_file(message_id)` (the original file, to pass on as it is; up to 50 MB).
 Messages show their media status (`saved`, `on_demand`, `waiting`, `expired`, `failed`, `skipped`) and, for voice
 notes, `transcript_status` and the transcript (`[he 0:12] ...` lines). Search covers transcripts too.
 
-Original files (to pass on as they are, e.g. to Telegram): `GET /files/<message id>` on the same host, with the
-client's Cloudflare service-token headers. Saved files only (409: call `request_media` first); same chat scope as
-the tools. Cloudflare rejects some default user agents (error 1010), so send your own:
-
-```sh
-curl -fsS -A my-client/1 -H "CF-Access-Client-Id: $ID" -H "CF-Access-Client-Secret: $SECRET" \
-  -OJ "https://wa.example.com/files/<message id>"
-```
-
-A Claude client without a shell can use nudnik's `bin/nudnik-files` (a small local MCP server that saves the file
-and returns its path).
+`get_file` returns the file as an MCP embedded resource: Claude Code saves it to disk and gives the session only
+the path (the bytes never enter the conversation), so a session can attach it to a Telegram message or a mail.
 
 ## Operate (LXC, `/opt/wa-gateway`)
 

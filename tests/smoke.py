@@ -207,18 +207,12 @@ asyncio.run(once())
 t = app.db.execute("select status, attempts from transcripts where sha256='longsha'").fetchone()
 ok(t["status"] == "waiting" and t["attempts"] == 1, "katzran down: transcript retried later, not lost")
 
-# --- files as they are (/files/<msg_id>) ------------------------------------------
-def fget(cid, mid):
-    h = {"Cf-Access-Jwt-Assertion": tok(cid)} if cid else {}
-    return H.get(f"/files/{mid}", headers=h)
-f = fget("pid.access", "img2")
-ok(f.status_code == 200 and f.content == PNG and f.headers["content-type"] == "image/png"
-   and "Dana" in f.headers["content-disposition"] and ".png" in f.headers["content-disposition"],
-   "files: saved file as is, with a readable name")
-ok(fget(None, "img2").status_code == 401, "files: no Cloudflare token, refused")
-ok(fget("oid.access", "ptt1").status_code == 404, "files: scoped to client's chats")
-ok(fget("pid.access", "vid1").status_code == 409, "files: not saved yet, says to request_media")
-fl = call("pid.access", "get_file_link", message_id="img2")
-ok(fl["url"] == "https://wa.test/files/img2" and fl["filename"].endswith(".png"), "get_file_link: address and name")
-ok("error" in call("pid.access", "get_file_link", message_id="vid1"), "get_file_link: not saved, says to request_media")
-ok("error" in call("oid.access", "get_file_link", message_id="ptt1"), "get_file_link: scoped to client's chats")
+# --- files as they are (get_file) ------------------------------------------------
+import base64
+gf = raw("pid.access", "get_file", message_id="img2")["content"]
+res = gf[1]["resource"] if len(gf) == 2 and gf[1]["type"] == "resource" else {}
+ok(base64.b64decode(res.get("blob", "")) == PNG and res.get("mimeType") == "image/png"
+   and json.loads(gf[0]["text"])["filename"].startswith("Dana ") and res["uri"].endswith(".png"),
+   "get_file: the original file as an embedded resource, with a readable name")
+ok("error" in raw("pid.access", "get_file", message_id="vid1")["content"][0]["text"], "get_file: not saved, says to request_media")
+ok("error" in raw("oid.access", "get_file", message_id="ptt1")["content"][0]["text"], "get_file: scoped to client's chats")
