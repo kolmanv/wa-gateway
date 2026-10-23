@@ -35,7 +35,8 @@ WhatsApp ── WAHA (WEBJS: real WhatsApp Web in Chrome, pinned build) ──we
 `get_status`, `list_chats`, `get_messages(chat_id, before_seq)`, `search_messages(query, chat_id)`,
 `get_new_messages()` (cursor kept server-side per client), `list_media(chat_id, type, status)`,
 `get_media(message_id)` (details; images as images, PDF and text as text, audio as its transcript),
-`request_media(message_id)` (fetch now; audio and video also get a transcript).
+`request_media(message_id)` (fetch now; audio and video also get a transcript),
+`get_file_link(message_id)` (where to download the original file, below).
 Messages show their media status (`saved`, `on_demand`, `waiting`, `expired`, `failed`, `skipped`) and, for voice
 notes, `transcript_status` and the transcript (`[he 0:12] ...` lines). Search covers transcripts too.
 

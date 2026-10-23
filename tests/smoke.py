@@ -218,3 +218,7 @@ ok(f.status_code == 200 and f.content == PNG and f.headers["content-type"] == "i
 ok(fget(None, "img2").status_code == 401, "files: no Cloudflare token, refused")
 ok(fget("oid.access", "ptt1").status_code == 404, "files: scoped to client's chats")
 ok(fget("pid.access", "vid1").status_code == 409, "files: not saved yet, says to request_media")
+fl = call("pid.access", "get_file_link", message_id="img2")
+ok(fl["url"] == "https://wa.test/files/img2" and fl["filename"].endswith(".png"), "get_file_link: address and name")
+ok("error" in call("pid.access", "get_file_link", message_id="vid1"), "get_file_link: not saved, says to request_media")
+ok("error" in call("oid.access", "get_file_link", message_id="ptt1"), "get_file_link: scoped to client's chats")
