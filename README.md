@@ -39,6 +39,18 @@ WhatsApp ── WAHA (WEBJS: real WhatsApp Web in Chrome, pinned build) ──we
 Messages show their media status (`saved`, `on_demand`, `waiting`, `expired`, `failed`, `skipped`) and, for voice
 notes, `transcript_status` and the transcript (`[he 0:12] ...` lines). Search covers transcripts too.
 
+Original files (to pass on as they are, e.g. to Telegram): `GET /files/<message id>` on the same host, with the
+client's Cloudflare service-token headers. Saved files only (409: call `request_media` first); same chat scope as
+the tools. Cloudflare rejects some default user agents (error 1010), so send your own:
+
+```sh
+curl -fsS -A my-client/1 -H "CF-Access-Client-Id: $ID" -H "CF-Access-Client-Secret: $SECRET" \
+  -OJ "https://wa.example.com/files/<message id>"
+```
+
+A Claude client without a shell can use nudnik's `bin/nudnik-files` (a small local MCP server that saves the file
+and returns its path).
+
 ## Operate (LXC, `/opt/wa-gateway`)
 
 ```sh
