@@ -53,12 +53,12 @@ m = lambda i, frm, to, body, me=False, part=None: {"id": i, "from": frm, "to": t
 ok(hook("message.any", m("a", "x@c.us", "me@c.us", "hello"), sig="bad") == 401, "bad HMAC rejected")
 ok(hook("message.any", m("1", "x@c.us", "me@c.us", "lunch tomorrow?")) == 200, "webhook accepted")
 hook("message.any", m("2", "g1@g.us", "me@c.us", "work: deploy at five", part="y@c.us"))
-hook("message.any", m("3", "me@c.us", "g2@g.us", "family dinner", me=True))
+hook("message.any", m("true_g2@g.us_3EB0AA11", "me@c.us", "g2@g.us", "family dinner", me=True))
 hook("message.any", m("1", "x@c.us", "me@c.us", "lunch tomorrow?"))  # duplicate delivery
 hook("message.any", m("s", "status@broadcast", "me@c.us", "story"))
 ok(app.db.execute("select count(*) from messages").fetchone()[0] == 3, "dedupe + status@broadcast skipped")
 hook("message.edited", {"id": "e", "body": "work: deploy at six", "editedMessageId": "2"})
-hook("message.revoked", {"revokedMessageId": "3", "before": {"id": "3"}})
+hook("message.revoked", {"revokedMessageId": "3EB0AA11"})  # WEBJS: the bare key, often no "before"
 
 ok(call(None, "list_chats").startswith("ERROR"), "no token -> refused")
 ok(call("badaud", "list_chats").startswith("ERROR"), "wrong audience -> refused")
@@ -72,7 +72,12 @@ ok(call("mid.access", "get_status")["status"] == "ok", "monitor can read status"
 s = call("pid.access", "search_messages", query="deploy six")["messages"]
 ok(len(s) == 1 and s[0]["edited"] == 1, "edit updates body and FTS")
 r = call("pid.access", "get_messages", chat_id="g2@g.us")["messages"][0]
-ok(r["revoked"] == 1 and r["body"] is None, "revoked message text dropped")
+ok(r["revoked"] == 1 and r["body"] is None and r["deleted"], "deleted message: text withheld by default")
+r = call("pid.access", "get_messages", chat_id="g2@g.us", with_deleted=True)["messages"][0]
+ok(r["body"] == "family dinner" and "deleted" not in r, "with_deleted shows the text")
+ok(call("pid.access", "search_messages", query="dinner")["messages"] == [], "search skips deleted by default")
+ok(len(call("pid.access", "search_messages", query="dinner", with_deleted=True)["messages"]) == 1,
+   "search finds deleted with with_deleted")
 ok(call("pid.access", "search_messages", query='lunch" OR "x')["messages"] == [], "FTS syntax is escaped")
 
 n1 = call("pid.access", "get_new_messages"); n2 = call("pid.access", "get_new_messages")
