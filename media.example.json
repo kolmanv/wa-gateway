@@ -7,5 +7,5 @@
   "max_per_hour": 60,
   "keep_days": 365,
   "transcribe_types": ["ptt", "audio"],
-  "transcribe_max_minutes": 30
+  "transcribe_max_minutes": 15
 }

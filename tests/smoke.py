@@ -211,6 +211,9 @@ async def once(): await app.transcribe("longsha")
 asyncio.run(once())
 t = app.db.execute("select status, attempts from transcripts where sha256='longsha'").fetchone()
 ok(t["status"] == "waiting" and t["attempts"] == 1, "katzran down: transcript retried later, not lost")
+asyncio.run(once())
+t = app.db.execute("select status, attempts from transcripts where sha256='longsha'").fetchone()
+ok(t["status"] == "failed" and t["attempts"] == 2, "katzran down twice: transcript failed, no more tries")
 
 # --- files as they are (get_file) ------------------------------------------------
 import base64

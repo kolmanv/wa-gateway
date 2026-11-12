@@ -53,7 +53,7 @@ MEDIA_FILE = env("MEDIA_FILE", "/app/media.json")
 # service, KATZRAN_URL/KATZRAN_TOKEN); longer ones, and video, on request_media.
 MEDIA = {"auto_types": ["ptt", "audio", "image", "document"], "max_mb": {"image": 20, "document": 30},
          "skip_chats": {}, "save_own": True, "delay_seconds": [3, 30], "max_per_hour": 60, "keep_days": 365,
-         "transcribe_types": ["ptt", "audio"], "transcribe_max_minutes": 30,
+         "transcribe_types": ["ptt", "audio"], "transcribe_max_minutes": 15,
          **(json.load(open(MEDIA_FILE)) if os.path.exists(MEDIA_FILE) else {})}
 MEDIA_DIR = env("MEDIA_DIR", "/data/media")
 FILE_MAX_MB = 50  # get_file; Telegram bots can send up to 50 MB
@@ -254,7 +254,8 @@ def want_transcript(kind, sha, duration, force=False):
         return
     limit = MEDIA["transcribe_max_minutes"] * 60
     status, reason = ("waiting", None) if force or (duration or 0) <= limit else \
-        ("on_demand", f"longer than {MEDIA['transcribe_max_minutes']} minutes: transcribed on request_media")
+        ("on_demand", f"longer than {MEDIA['transcribe_max_minutes']} minutes: transcribed on request_media "
+                      "(katzran may still refuse long audio; then transcribe the file with the owner's approval)")
     db.execute("INSERT INTO transcripts(sha256, status, reason, created_at) VALUES (?,?,?,?) ON CONFLICT(sha256) DO "
                "UPDATE SET status=excluded.status, reason=excluded.reason, attempts=0", (sha, status, reason, int(time.time())))
     if status == "waiting" and transcripts_q:
@@ -281,21 +282,25 @@ def transcript_text(segments):
 async def transcribe(sha):
     if not db.execute("SELECT 1 FROM transcripts WHERE sha256=? AND status='waiting'", (sha,)).fetchone():
         return
-    f = db.execute("SELECT path FROM media WHERE sha256=? AND status='saved' AND path IS NOT NULL", (sha,)).fetchone()
+    f = db.execute("SELECT path, duration FROM media WHERE sha256=? AND status='saved' AND path IS NOT NULL",
+                   (sha,)).fetchone()
     if not f:
         return db.execute("UPDATE transcripts SET status='failed', reason='file no longer saved' WHERE sha256=?", (sha,))
     try:
         with open(os.path.join(MEDIA_DIR, f["path"]), "rb") as fh:
             job = await katzran("POST", "/jobs", content=fh.read())
-        for _ in range(2400):  # 2 hours
+        # katzran works faster than real time: waiting the recording's length plus 2 minutes is plenty, and a
+        # hung katzran mustn't hold up the voice notes queued behind this one
+        deadline = time.time() + (f["duration"] or 15 * 60) + 120
+        while job["status"] not in ("done", "failed"):
+            if time.time() > deadline:
+                raise TimeoutError("no result in the recording's length + 2 min")
             await asyncio.sleep(3)
             job = await katzran("GET", f"/jobs/{job['id']}")
-            if job["status"] in ("done", "failed"):
-                break
         await katzran("DELETE", f"/jobs/{job['id']}")
-    except Exception as e:  # katzran down or restarted (a restart drops its jobs): try again later
+    except Exception as e:  # katzran down, restarted (it drops its jobs) or too slow: one more try later
         attempts = db.execute("SELECT attempts FROM transcripts WHERE sha256=?", (sha,)).fetchone()[0] + 1
-        status = "waiting" if attempts < 5 else "failed"
+        status = "waiting" if attempts < 2 else "failed"
         db.execute("UPDATE transcripts SET status=?, reason=?, attempts=? WHERE sha256=?",
                    (status, f"katzran: {e}"[:200], attempts, sha))
         log.info("transcript %s %s: %s", sha[:12], status, e)
