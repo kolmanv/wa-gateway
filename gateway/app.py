@@ -52,7 +52,7 @@ MEDIA_FILE = env("MEDIA_FILE", "/app/media.json")
 # Saved voice notes and audio up to transcribe_max_minutes are transcribed by katzran (a local speech-to-text
 # service, KATZRAN_URL/KATZRAN_TOKEN); longer ones, and video, on request_media.
 MEDIA = {"auto_types": ["ptt", "audio", "image", "document"], "max_mb": {"image": 20, "document": 30},
-         "skip_chats": {}, "save_own": True, "delay_seconds": [3, 30], "max_per_hour": 60, "keep_days": 365,
+         "skip_chats": {}, "save_own": True, "delay_seconds": [3, 30], "max_per_hour": 60, "keep_days": None,
          "transcribe_types": ["ptt", "audio"], "transcribe_max_minutes": 15,
          **(json.load(open(MEDIA_FILE)) if os.path.exists(MEDIA_FILE) else {})}
 MEDIA_DIR = env("MEDIA_DIR", "/data/media")
@@ -209,7 +209,7 @@ async def save_media(msg_id, auto=True):
         db.execute("UPDATE media SET status='saved', reason=NULL, attempts=attempts+1, sha256=?, path=?, saved_at=?,"
                    " delete_after=?, mimetype=coalesce(mimetype, ?), filename=coalesce(filename, ?),"
                    " size=coalesce(size, ?) WHERE msg_id=?",
-                   (sha, rel, now, now + MEDIA["keep_days"] * 86400, mime, media.get("filename"), len(content), msg_id))
+                   (sha, rel, now, now + MEDIA["keep_days"] * 86400 if MEDIA["keep_days"] else None, mime, media.get("filename"), len(content), msg_id))
         want_transcript(row["type"], sha, row["duration"])
 
 
@@ -227,7 +227,8 @@ async def downloader():
 
 
 def cleanup_media():
-    """Delete files past keep_days; a file shared by several messages goes when the last one expires."""
+    """Delete files past keep_days (null: kept forever); a file shared by several messages goes when the last one
+    expires."""
     for r in db.execute("SELECT msg_id, sha256, path FROM media WHERE status='saved' AND delete_after < ?",
                         (time.time(),)).fetchall():
         db.execute("UPDATE media SET status='deleted', reason='past keep_days', path=NULL WHERE msg_id=?",

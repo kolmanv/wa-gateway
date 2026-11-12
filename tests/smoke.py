@@ -165,6 +165,8 @@ for meth, path in [("POST", "/api/default/chats/x@c.us/messages/abc"), ("GET", "
     try: app.guard(meth, path); ok(False, f"guard {meth} {path}")
     except PermissionError: pass
 ok(True, "guard: only GET of one message and its file are new")
+ok(app.db.execute("select delete_after from media where msg_id='img2'").fetchone()[0] is None,
+   "saved files are kept forever by default")
 app.db.execute("update media set delete_after=0 where msg_id='img1'"); app.cleanup_media()
 p = app.db.execute("select path from media where msg_id='img2'").fetchone()[0]
 ok(os.path.exists(f"/tmp/media/{p}"), "cleanup keeps a file another message still uses")

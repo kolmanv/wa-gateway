@@ -15,7 +15,8 @@ WhatsApp ── WAHA (WEBJS: real WhatsApp Web in Chrome, pinned build) ──we
 - **Pinned.** WAHA by image digest (`waha/Dockerfile`); WhatsApp Web by build (`scripts/pin-webversion.sh`, builds
   live ~2 months). The page bypasses WhatsApp's service worker, which otherwise loads the latest build after login.
 - **Media, modestly.** New voice notes, audio, images and documents (yours too, unless `save_own` is false) are saved as they arrive: one at a
-  time, after a random 3-30 s pause, at most `max_per_hour`, stored once per checksum, deleted after `keep_days`.
+  time, after a random 3-30 s pause, at most `max_per_hour`, stored once per checksum, kept forever (or
+  deleted after `keep_days`, if set).
   Everything else (video, stickers, large files, chats in `skip_chats`) is fetched only on request. In groups, WAHA
   also reads the receipts of your own messages when fetching them (like opening Message info).
   Rules in `media.json` (see `media.example.json`); `skip_chats` takes chat ids with `"*"` or a list of types.
